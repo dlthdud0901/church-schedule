@@ -3,6 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="반주자 스케줄">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./church-logo.png">
   <title>반주자 스케줄 관리</title>
   <style>
     :root {
@@ -496,6 +501,15 @@
       </div>
 
       <div class="section">
+        <h2>푸시 알림</h2>
+        <div class="stack">
+          <button class="primary" id="enablePushBtn" type="button">이 기기 알림 받기</button>
+          <button class="ghost" id="testPushBtn" type="button">테스트 알림 보내기</button>
+          <p id="pushStatus">iPhone은 Safari에서 홈 화면에 추가한 뒤 알림을 허용해야 합니다.</p>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="row between">
           <h2>반주자</h2>
           <button class="ghost" id="addPersonBtn" type="button">추가</button>
@@ -596,6 +610,22 @@
           </div>
           <div class="service-checks" id="fixedServiceChecks"></div>
         </div>
+
+        <div class="stack">
+          <div>
+            <h3>확정 담당 알림</h3>
+            <p>변경 승인 후 담당자가 된 사람에게 며칠 전에 알려줄지 선택합니다.</p>
+          </div>
+          <div class="service-checks" id="reminderDayChecks"></div>
+        </div>
+
+        <div class="stack">
+          <div>
+            <h3>미승인 요청 알림</h3>
+            <p>변경 요청이 아직 승인되지 않았을 때 모두에게 며칠 전에 다시 알려줄지 선택합니다.</p>
+          </div>
+          <div class="service-checks" id="requestReminderDayChecks"></div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="danger" id="deletePerson" type="button">삭제</button>
@@ -685,15 +715,16 @@
 
     const defaultState = {
       people: [
-        { id: "p1", name: "반주자 A", color: "#2563eb", fixedServiceIds: ["wed"] },
-        { id: "p2", name: "반주자 B", color: "#16a34a", fixedServiceIds: ["fri"] },
-        { id: "p3", name: "반주자 C", color: "#f97316", fixedServiceIds: [] }
+        { id: "p1", name: "반주자 A", color: "#2563eb", fixedServiceIds: ["wed"], reminderDays: [7, 3, 1], requestReminderDays: [3, 1] },
+        { id: "p2", name: "반주자 B", color: "#16a34a", fixedServiceIds: ["fri"], reminderDays: [7, 3, 1], requestReminderDays: [3, 1] },
+        { id: "p3", name: "반주자 C", color: "#f97316", fixedServiceIds: [], reminderDays: [7, 3, 1], requestReminderDays: [3, 1] }
       ],
       activePersonId: "p1",
       overrides: {}
     };
 
     const defaultColors = ["#2563eb", "#16a34a", "#f97316", "#9333ea", "#dc2626", "#0891b2"];
+    const dayOptions = [14, 7, 3, 1];
 
     const els = {
       activePerson: document.querySelector("#activePerson"),
@@ -705,8 +736,13 @@
       personName: document.querySelector("#personName"),
       personColor: document.querySelector("#personColor"),
       fixedServiceChecks: document.querySelector("#fixedServiceChecks"),
+      reminderDayChecks: document.querySelector("#reminderDayChecks"),
+      requestReminderDayChecks: document.querySelector("#requestReminderDayChecks"),
       deletePerson: document.querySelector("#deletePerson"),
       savePerson: document.querySelector("#savePerson"),
+      enablePushBtn: document.querySelector("#enablePushBtn"),
+      testPushBtn: document.querySelector("#testPushBtn"),
+      pushStatus: document.querySelector("#pushStatus"),
       shareUrlBox: document.querySelector("#shareUrlBox"),
       copyShareBtn: document.querySelector("#copyShareBtn"),
       syncStatus: document.querySelector("#syncStatus"),
@@ -773,7 +809,9 @@
         id: person.id || `p${Date.now()}${index}`,
         name: person.name || `반주자 ${index + 1}`,
         color: person.color || defaultColors[index % defaultColors.length],
-        fixedServiceIds: Array.isArray(person.fixedServiceIds) ? person.fixedServiceIds : []
+        fixedServiceIds: Array.isArray(person.fixedServiceIds) ? person.fixedServiceIds : [],
+        reminderDays: Array.isArray(person.reminderDays) ? person.reminderDays : [7, 3, 1],
+        requestReminderDays: Array.isArray(person.requestReminderDays) ? person.requestReminderDays : [3, 1]
       }));
 
       if (!normalized.people.some(person => person.id === normalized.activePersonId)) {
@@ -783,11 +821,11 @@
       return normalized;
     }
 
-    function saveState() {
+    function saveState(notificationEvent = null) {
       localStorage.setItem("pianistScheduleState", JSON.stringify(state));
       updateShareUrl();
       render();
-      queueRemoteSave();
+      queueRemoteSave(notificationEvent);
     }
 
     function encodeState() {
@@ -812,6 +850,10 @@
 
     function hasRemoteConfig() {
       return Boolean(appConfig.SUPABASE_URL && appConfig.SUPABASE_ANON_KEY && window.supabase);
+    }
+
+    function hasPushConfig() {
+      return Boolean(appConfig.VAPID_PUBLIC_KEY);
     }
 
     function setSyncStatus(message, kind = "muted") {
@@ -872,15 +914,15 @@
       }
     }
 
-    function queueRemoteSave() {
+    function queueRemoteSave(notificationEvent = null) {
       if (!supabaseClient || applyingRemoteState) return;
       clearTimeout(remoteSaveTimer);
       remoteSaveTimer = setTimeout(() => {
-        persistRemoteState();
+        persistRemoteState(notificationEvent);
       }, 350);
     }
 
-    async function persistRemoteState() {
+    async function persistRemoteState(notificationEvent = null) {
       if (!supabaseClient) return;
       const { error } = await supabaseClient
         .from("schedule_state")
@@ -897,6 +939,113 @@
       }
 
       setSyncStatus("DB 저장 완료: 공유 URL 접속자에게 반영됩니다.", "good");
+      if (notificationEvent) {
+        await sendNotificationEvent(notificationEvent);
+      }
+    }
+
+    async function sendNotificationEvent(notificationEvent) {
+      if (!supabaseClient) return;
+      try {
+        await supabaseClient.functions.invoke("send-schedule-notifications", {
+          body: {
+            mode: "event",
+            stateId: remoteStateId,
+            state,
+            event: notificationEvent
+          }
+        });
+      } catch (error) {
+        console.warn("Notification event failed", error);
+      }
+    }
+
+    function setPushStatus(message, kind = "muted") {
+      els.pushStatus.textContent = message;
+      els.pushStatus.style.color = kind === "good" ? "var(--good)" : kind === "danger" ? "var(--danger)" : "var(--muted)";
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = "=".repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = atob(base64);
+      return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+    }
+
+    function isStandaloneApp() {
+      return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+    }
+
+    async function registerServiceWorker() {
+      if (!("serviceWorker" in navigator)) {
+        throw new Error("이 브라우저는 서비스 워커를 지원하지 않습니다.");
+      }
+      return navigator.serviceWorker.register("./service-worker.js");
+    }
+
+    async function enablePushNotifications() {
+      if (!supabaseClient) {
+        setPushStatus("DB 연결 후 알림을 설정할 수 있습니다.", "danger");
+        return;
+      }
+      if (!hasPushConfig()) {
+        setPushStatus("config.js에 VAPID_PUBLIC_KEY를 넣어야 푸시 알림을 켤 수 있습니다.", "danger");
+        return;
+      }
+      if (!("Notification" in window) || !("PushManager" in window)) {
+        setPushStatus("이 기기/브라우저는 웹 푸시 알림을 지원하지 않습니다.", "danger");
+        return;
+      }
+      if (!isStandaloneApp()) {
+        setPushStatus("iPhone은 Safari 공유 버튼 > 홈 화면에 추가 후 홈 화면 아이콘으로 실행해야 알림을 켤 수 있습니다.", "danger");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushStatus("알림 권한이 허용되지 않았습니다.", "danger");
+        return;
+      }
+
+      const registration = await registerServiceWorker();
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(appConfig.VAPID_PUBLIC_KEY)
+      });
+
+      const { error } = await supabaseClient.from("push_subscriptions").upsert({
+        endpoint: subscription.endpoint,
+        person_id: state.activePersonId,
+        state_id: remoteStateId,
+        subscription,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) {
+        setPushStatus(`알림 구독 저장 실패: ${error.message}`, "danger");
+        return;
+      }
+
+      setPushStatus(`${getPerson(state.activePersonId).name} 님의 이 기기에 알림을 보냅니다.`, "good");
+    }
+
+    async function sendTestPushNotification() {
+      if (!supabaseClient) {
+        setPushStatus("DB 연결 후 테스트 알림을 보낼 수 있습니다.", "danger");
+        return;
+      }
+
+      await supabaseClient.functions.invoke("send-schedule-notifications", {
+        body: {
+          mode: "test",
+          stateId: remoteStateId,
+          personId: state.activePersonId,
+          title: "반주자 스케줄 테스트",
+          body: "알림 설정이 정상적으로 연결되었습니다."
+        }
+      });
+      setPushStatus("테스트 알림 요청을 보냈습니다.", "good");
     }
 
     function pad(value) {
@@ -959,7 +1108,9 @@
         available: override.available || [],
         note: override.note || "",
         setlistOrder: override.setlistOrder || override.setlist || "",
-        setlistImage: override.setlistImage || null
+        setlistImage: override.setlistImage || null,
+        requestedByPersonId: override.requestedByPersonId || null,
+        confirmedByPersonId: override.confirmedByPersonId || null
       };
     }
 
@@ -1188,6 +1339,16 @@
       `).join("");
     }
 
+    function renderDayChecks(container, selectedDays = []) {
+      const selected = new Set(selectedDays.map(Number));
+      container.innerHTML = dayOptions.map(day => `
+        <label class="check-tile">
+          <input type="checkbox" value="${day}" ${selected.has(day) ? "checked" : ""}>
+          ${day}일 전
+        </label>
+      `).join("");
+    }
+
     function openPersonEditor(personId = null) {
       editingPersonId = personId;
       const person = personId ? getPerson(personId) : null;
@@ -1195,6 +1356,8 @@
       els.personName.value = person?.name || "";
       els.personColor.value = person?.color || defaultColors[state.people.length % defaultColors.length];
       renderFixedServiceChecks(person?.fixedServiceIds || []);
+      renderDayChecks(els.reminderDayChecks, person?.reminderDays || [7, 3, 1]);
+      renderDayChecks(els.requestReminderDayChecks, person?.requestReminderDays || [3, 1]);
       els.deletePerson.style.display = person ? "" : "none";
       els.personModal.classList.add("open");
     }
@@ -1206,6 +1369,10 @@
 
     function selectedFixedServiceIds() {
       return Array.from(els.fixedServiceChecks.querySelectorAll("input:checked")).map(input => input.value);
+    }
+
+    function selectedDays(container) {
+      return Array.from(container.querySelectorAll("input:checked")).map(input => Number(input.value)).sort((a, b) => b - a);
     }
 
     function savePersonEditor() {
@@ -1228,12 +1395,16 @@
         person.name = name;
         person.color = els.personColor.value;
         person.fixedServiceIds = fixedServiceIds;
+        person.reminderDays = selectedDays(els.reminderDayChecks);
+        person.requestReminderDays = selectedDays(els.requestReminderDayChecks);
       } else {
         state.people.push({
           id,
           name,
           color: els.personColor.value,
-          fixedServiceIds
+          fixedServiceIds,
+          reminderDays: selectedDays(els.reminderDayChecks),
+          requestReminderDays: selectedDays(els.requestReminderDayChecks)
         });
         state.activePersonId = id;
       }
@@ -1281,19 +1452,68 @@
 
     function getOverrideDraft() {
       const previous = state.overrides[selectedEventId] || {};
-      return {
+      const nextStatus = els.requestStatus.value;
+      const nextAssignedPersonId = els.assignedPerson.value;
+      const draft = {
         ...previous,
-        assignedPersonId: els.assignedPerson.value,
-        status: els.requestStatus.value,
+        assignedPersonId: nextAssignedPersonId,
+        status: nextStatus,
         note: els.requestNote.value.trim(),
         setlistOrder: els.setlistOrder.value.trim(),
         setlistImage: selectedImage
       };
+
+      if (nextStatus === "needed" && previous.status !== "needed" && !previous.requestedByPersonId) {
+        draft.requestedByPersonId = state.activePersonId;
+      }
+
+      if (nextStatus === "confirmed" && (previous.status !== "confirmed" || previous.assignedPersonId !== nextAssignedPersonId)) {
+        draft.confirmedByPersonId = state.activePersonId;
+        draft.confirmedAt = new Date().toISOString();
+      }
+
+      if (nextStatus === "none") {
+        delete draft.requestedByPersonId;
+        delete draft.confirmedByPersonId;
+        delete draft.confirmedAt;
+      }
+
+      return draft;
+    }
+
+    function buildNotificationEvent(eventId, previous, draft) {
+      if (draft.status === "needed" && previous.status !== "needed") {
+        return {
+          type: "change_requested",
+          eventId,
+          requestedByPersonId: draft.requestedByPersonId || state.activePersonId
+        };
+      }
+
+      if (draft.status === "confirmed" && (previous.status !== "confirmed" || previous.assignedPersonId !== draft.assignedPersonId)) {
+        return {
+          type: "change_confirmed",
+          eventId,
+          requestedByPersonId: draft.requestedByPersonId || previous.requestedByPersonId || null,
+          assignedPersonId: draft.assignedPersonId,
+          confirmedByPersonId: state.activePersonId
+        };
+      }
+
+      return null;
     }
 
     els.activePerson.addEventListener("change", () => {
       state.activePersonId = els.activePerson.value;
       saveState();
+    });
+
+    els.enablePushBtn.addEventListener("click", () => {
+      enablePushNotifications();
+    });
+
+    els.testPushBtn.addEventListener("click", () => {
+      sendTestPushNotification();
     });
 
     els.addPersonBtn.addEventListener("click", () => {
@@ -1388,8 +1608,11 @@
 
     els.saveEvent.addEventListener("click", () => {
       if (!selectedEventId) return;
-      state.overrides[selectedEventId] = getOverrideDraft();
-      saveState();
+      const previous = state.overrides[selectedEventId] || {};
+      const draft = getOverrideDraft();
+      state.overrides[selectedEventId] = draft;
+      const notificationEvent = buildNotificationEvent(selectedEventId, previous, draft);
+      saveState(notificationEvent);
       els.eventModal.classList.remove("open");
     });
 
