@@ -504,7 +504,6 @@
         <h2>푸시 알림</h2>
         <div class="stack">
           <button class="primary" id="enablePushBtn" type="button">이 기기 알림 받기</button>
-          <button class="ghost" id="testPushBtn" type="button">테스트 알림 보내기</button>
           <p id="pushStatus">iPhone은 Safari에서 홈 화면에 추가한 뒤 알림을 허용해야 합니다.</p>
         </div>
       </div>
@@ -741,7 +740,6 @@
       deletePerson: document.querySelector("#deletePerson"),
       savePerson: document.querySelector("#savePerson"),
       enablePushBtn: document.querySelector("#enablePushBtn"),
-      testPushBtn: document.querySelector("#testPushBtn"),
       pushStatus: document.querySelector("#pushStatus"),
       shareUrlBox: document.querySelector("#shareUrlBox"),
       copyShareBtn: document.querySelector("#copyShareBtn"),
@@ -1028,24 +1026,6 @@
       }
 
       setPushStatus(`${getPerson(state.activePersonId).name} 님의 이 기기에 알림을 보냅니다.`, "good");
-    }
-
-    async function sendTestPushNotification() {
-      if (!supabaseClient) {
-        setPushStatus("DB 연결 후 테스트 알림을 보낼 수 있습니다.", "danger");
-        return;
-      }
-
-      await supabaseClient.functions.invoke("send-schedule-notifications", {
-        body: {
-          mode: "test",
-          stateId: remoteStateId,
-          personId: state.activePersonId,
-          title: "반주자 스케줄 테스트",
-          body: "알림 설정이 정상적으로 연결되었습니다."
-        }
-      });
-      setPushStatus("테스트 알림 요청을 보냈습니다.", "good");
     }
 
     function pad(value) {
@@ -1510,10 +1490,6 @@
 
     els.enablePushBtn.addEventListener("click", () => {
       enablePushNotifications();
-    });
-
-    els.testPushBtn.addEventListener("click", () => {
-      sendTestPushNotification();
     });
 
     els.addPersonBtn.addEventListener("click", () => {
