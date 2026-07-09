@@ -1,0 +1,1425 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>반주자 스케줄 관리</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #1f2937;
+      --muted: #667085;
+      --line: #d9dee8;
+      --brand: #2563eb;
+      --brand-soft: #eaf1ff;
+      --warn: #b45309;
+      --warn-soft: #fff7ed;
+      --good: #047857;
+      --good-soft: #ecfdf5;
+      --danger: #b42318;
+      --danger-soft: #fff1f0;
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Segoe UI", "Malgun Gothic", Arial, sans-serif;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 12px;
+      color: var(--ink);
+      background: #eef2f7;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(0.98); }
+    button.primary { color: #fff; background: var(--brand); }
+    button.good { color: var(--good); background: var(--good-soft); }
+    button.warn { color: var(--warn); background: var(--warn-soft); }
+    button.danger { color: var(--danger); background: var(--danger-soft); }
+    button.ghost { background: transparent; border: 1px solid var(--line); }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    textarea {
+      min-height: 94px;
+      resize: vertical;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: #fff;
+      padding: 22px;
+      overflow: auto;
+    }
+
+    main {
+      padding: 24px;
+      overflow: auto;
+    }
+
+    .brand {
+      margin-bottom: 22px;
+    }
+
+    .church-logo {
+      display: block;
+      width: 240px;
+      max-width: 100%;
+      height: auto;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .section {
+      padding: 16px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .stack { display: grid; gap: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .row > * { min-width: 0; }
+    .row.between { justify-content: space-between; }
+    .row.wrap { flex-wrap: wrap; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 12px;
+      background: #eef2f7;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pill.blue { color: var(--brand); background: var(--brand-soft); }
+    .pill.good { color: var(--good); background: var(--good-soft); }
+    .pill.warn { color: var(--warn); background: var(--warn-soft); }
+    .pill.danger { color: var(--danger); background: var(--danger-soft); }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .month-title {
+      width: 160px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 20px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .calendar {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .weekdays,
+    .days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .weekday {
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+    }
+
+    .day {
+      min-height: 150px;
+      padding: 8px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .day:nth-child(7n) { border-right: 0; }
+    .day.dim { background: #f3f5f9; color: #98a2b3; }
+
+    .date-number {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .today-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand);
+    }
+
+    .event {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: 8px;
+      padding: 7px;
+      margin-bottom: 6px;
+      background: #fff;
+      text-align: left;
+    }
+
+    .event.requested { border-left-color: var(--warn); background: var(--warn-soft); }
+    .event.changed { border-left-color: var(--good); background: var(--good-soft); }
+
+    .event-title {
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .event-meta {
+      display: grid;
+      gap: 3px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.25;
+    }
+
+    .event-meta span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .side-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .person {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .person strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .person small {
+      display: block;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .person-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+
+    .person-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .person-actions button {
+      padding: 7px 8px;
+      font-size: 12px;
+    }
+
+    .service-checks {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .check-tile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .check-tile input {
+      width: auto;
+    }
+
+    input[type="color"] {
+      height: 42px;
+      padding: 4px;
+      cursor: pointer;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.38);
+      z-index: 10;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      width: min(720px, 100%);
+      max-height: min(86vh, 820px);
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 18px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      background: #fbfcff;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    label span {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .copy-box {
+      padding: 10px;
+      border-radius: 8px;
+      background: #f3f5f9;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      word-break: break-all;
+    }
+
+    .setlist-tools {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .file-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .image-preview {
+      display: none;
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .image-preview.visible { display: grid; }
+
+    .image-preview img {
+      max-width: 100%;
+      max-height: 260px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      object-fit: contain;
+      background: #f3f5f9;
+    }
+
+    .image-name {
+      color: var(--muted);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .empty {
+      padding: 12px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 1040px) {
+      .app { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1260px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      main, aside { padding: 16px; }
+      .topbar { align-items: stretch; flex-direction: column; }
+      .day { min-height: 118px; padding: 6px; }
+      .event-title, .event-meta { font-size: 11px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .month-title { width: auto; flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand">
+        <img class="church-logo" src="church-logo.png" alt="주내감리교회">
+        <h1>반주자 스케줄</h1>
+        <p>교대 요청, 가능 표시, 확정 배정, 찬양 콘티를 한 화면에서 관리합니다.</p>
+      </div>
+
+      <div class="section">
+        <h2>현재 사용자</h2>
+        <select id="activePerson"></select>
+      </div>
+
+      <div class="section">
+        <div class="row between">
+          <h2>반주자</h2>
+          <button class="ghost" id="addPersonBtn" type="button">추가</button>
+        </div>
+        <div class="stack" id="peopleList"></div>
+      </div>
+
+      <div class="section">
+        <h2>공유 URL</h2>
+        <div class="stack">
+          <button class="primary" id="copyShareBtn" type="button">앱 URL 복사</button>
+          <div class="copy-box" id="shareUrlBox"></div>
+          <p id="syncStatus">DB 연결 확인 중입니다.</p>
+          <p>배포 후 이 URL을 공유하면 모바일과 PC에서 같은 스케줄을 함께 볼 수 있습니다.</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>추천 구조</h2>
+        <div class="stack">
+          <span class="pill blue">예배 일정</span>
+          <span class="pill warn">교대 요청</span>
+          <span class="pill good">가능/확정</span>
+          <span class="pill">찬양 콘티</span>
+          <span class="pill">알림 D-7/D-3/D-1</span>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div class="month-nav">
+          <button id="prevMonth" type="button">이전</button>
+          <div class="month-title" id="monthTitle"></div>
+          <button id="nextMonth" type="button">다음</button>
+          <button class="ghost" id="todayBtn" type="button">오늘</button>
+        </div>
+        <div class="row wrap">
+          <span class="pill blue">기본 배정</span>
+          <span class="pill warn">변경 필요</span>
+          <span class="pill good">변경 확정</span>
+        </div>
+      </div>
+
+      <div class="layout">
+        <section class="calendar" aria-label="월간 스케줄">
+          <div class="weekdays">
+            <div class="weekday">일</div>
+            <div class="weekday">월</div>
+            <div class="weekday">화</div>
+            <div class="weekday">수</div>
+            <div class="weekday">목</div>
+            <div class="weekday">금</div>
+            <div class="weekday">토</div>
+          </div>
+          <div class="days" id="calendarDays"></div>
+        </section>
+
+        <section class="stack">
+          <div class="side-card">
+            <h2>알림</h2>
+            <div class="stack" id="reminders"></div>
+          </div>
+          <div class="side-card">
+            <h2>변경 요청</h2>
+            <div class="stack" id="requests"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="personModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 id="personModalTitle">반주자 등록</h2>
+          <p>이름, 표시 색상, 원래 담당하는 예배를 설정합니다.</p>
+        </div>
+        <button class="ghost" id="closePersonModal" type="button">닫기</button>
+      </div>
+      <div class="modal-body stack">
+        <div class="form-grid">
+          <label>
+            이름
+            <input id="personName" placeholder="예: 홍길동">
+          </label>
+          <label>
+            스케줄 색상
+            <input id="personColor" type="color" value="#2563eb">
+          </label>
+        </div>
+
+        <div class="stack">
+          <div>
+            <h3>고정 담당 예배</h3>
+            <p>선택한 예배는 매주 이 반주자가 기본 담당자로 표시됩니다.</p>
+          </div>
+          <div class="service-checks" id="fixedServiceChecks"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="danger" id="deletePerson" type="button">삭제</button>
+        <button class="primary" id="savePerson" type="button">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="eventModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle"></h2>
+          <p id="modalSubtitle"></p>
+        </div>
+        <button class="ghost" id="closeModal" type="button">닫기</button>
+      </div>
+      <div class="modal-body stack">
+        <div class="row wrap" id="statusPills"></div>
+
+        <div class="form-grid">
+          <label>
+            담당 반주자
+            <select id="assignedPerson"></select>
+          </label>
+          <label>
+            교대 요청 상태
+            <select id="requestStatus">
+              <option value="none">요청 없음</option>
+              <option value="needed">변경 필요</option>
+              <option value="confirmed">변경 확정</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          요청 메모
+          <input id="requestNote" placeholder="예: 출장으로 교대가 필요합니다">
+        </label>
+
+        <div class="stack">
+          <div class="row between">
+            <h3>가능한 사람</h3>
+            <button class="good" id="markAvailable" type="button">나는 가능</button>
+          </div>
+          <div class="row wrap" id="availablePeople"></div>
+        </div>
+
+        <label>
+          찬양 순서
+          <textarea id="setlistOrder" placeholder="예: 1. 묵도&#10;2. 찬양 - 주님 말씀하시면&#10;3. 대표기도&#10;4. 특송&#10;5. 설교 후 찬양 - 내 삶 드리리"></textarea>
+        </label>
+
+        <div class="setlist-tools">
+          <div>
+            <h3>찬양 콘티 사진</h3>
+            <p>JPG 또는 PNG 파일을 따로 올려두고, 위에는 그날 순서를 글로 정리합니다.</p>
+          </div>
+          <div class="file-row">
+            <input id="setlistImageInput" type="file" accept="image/png,image/jpeg">
+            <button class="danger" id="removeSetlistImage" type="button">사진 삭제</button>
+          </div>
+          <div class="image-preview" id="setlistImagePreview">
+            <img id="setlistImage" alt="찬양 콘티 사진 미리보기">
+            <div class="image-name" id="setlistImageName"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="danger" id="clearEvent" type="button">이 일정 초기화</button>
+        <button class="primary" id="saveEvent" type="button">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script>
+    const services = [
+      { id: "wed", label: "수요예배", weekday: 3 },
+      { id: "fri", label: "금요 철야 예배", weekday: 5 },
+      { id: "sun-pre1", label: "주일 1부 준비찬양", weekday: 0 },
+      { id: "sun-1", label: "주일 1부 예배", weekday: 0 },
+      { id: "sun-pre2", label: "주일 2부 준비찬양", weekday: 0 },
+      { id: "sun-2", label: "주일 2부 예배", weekday: 0 }
+    ];
+
+    const defaultState = {
+      people: [
+        { id: "p1", name: "반주자 A", color: "#2563eb", fixedServiceIds: ["wed"] },
+        { id: "p2", name: "반주자 B", color: "#16a34a", fixedServiceIds: ["fri"] },
+        { id: "p3", name: "반주자 C", color: "#f97316", fixedServiceIds: [] }
+      ],
+      activePersonId: "p1",
+      overrides: {}
+    };
+
+    const defaultColors = ["#2563eb", "#16a34a", "#f97316", "#9333ea", "#dc2626", "#0891b2"];
+
+    const els = {
+      activePerson: document.querySelector("#activePerson"),
+      addPersonBtn: document.querySelector("#addPersonBtn"),
+      peopleList: document.querySelector("#peopleList"),
+      personModal: document.querySelector("#personModal"),
+      personModalTitle: document.querySelector("#personModalTitle"),
+      closePersonModal: document.querySelector("#closePersonModal"),
+      personName: document.querySelector("#personName"),
+      personColor: document.querySelector("#personColor"),
+      fixedServiceChecks: document.querySelector("#fixedServiceChecks"),
+      deletePerson: document.querySelector("#deletePerson"),
+      savePerson: document.querySelector("#savePerson"),
+      shareUrlBox: document.querySelector("#shareUrlBox"),
+      copyShareBtn: document.querySelector("#copyShareBtn"),
+      syncStatus: document.querySelector("#syncStatus"),
+      prevMonth: document.querySelector("#prevMonth"),
+      nextMonth: document.querySelector("#nextMonth"),
+      todayBtn: document.querySelector("#todayBtn"),
+      monthTitle: document.querySelector("#monthTitle"),
+      calendarDays: document.querySelector("#calendarDays"),
+      reminders: document.querySelector("#reminders"),
+      requests: document.querySelector("#requests"),
+      eventModal: document.querySelector("#eventModal"),
+      modalTitle: document.querySelector("#modalTitle"),
+      modalSubtitle: document.querySelector("#modalSubtitle"),
+      statusPills: document.querySelector("#statusPills"),
+      closeModal: document.querySelector("#closeModal"),
+      assignedPerson: document.querySelector("#assignedPerson"),
+      requestStatus: document.querySelector("#requestStatus"),
+      requestNote: document.querySelector("#requestNote"),
+      markAvailable: document.querySelector("#markAvailable"),
+      availablePeople: document.querySelector("#availablePeople"),
+      setlistOrder: document.querySelector("#setlistOrder"),
+      setlistImageInput: document.querySelector("#setlistImageInput"),
+      setlistImagePreview: document.querySelector("#setlistImagePreview"),
+      setlistImage: document.querySelector("#setlistImage"),
+      setlistImageName: document.querySelector("#setlistImageName"),
+      removeSetlistImage: document.querySelector("#removeSetlistImage"),
+      clearEvent: document.querySelector("#clearEvent"),
+      saveEvent: document.querySelector("#saveEvent")
+    };
+
+    let state = loadState();
+    let viewDate = new Date();
+    let selectedEventId = null;
+    let selectedImage = null;
+    let editingPersonId = null;
+    let supabaseClient = null;
+    let remoteSaveTimer = null;
+    let applyingRemoteState = false;
+    const appConfig = window.SCHEDULE_APP_CONFIG || {};
+    const remoteStateId = appConfig.STATE_ID || "main";
+
+    function loadState() {
+      const fromHash = decodeHash();
+      if (fromHash) {
+        const next = normalizeState(fromHash);
+        localStorage.setItem("pianistScheduleState", JSON.stringify(next));
+        return next;
+      }
+      const stored = localStorage.getItem("pianistScheduleState");
+      if (stored) {
+        try { return normalizeState(JSON.parse(stored)); } catch (_) {}
+      }
+      return normalizeState(structuredClone(defaultState));
+    }
+
+    function normalizeState(next) {
+      const normalized = {
+        people: Array.isArray(next.people) && next.people.length ? next.people : structuredClone(defaultState.people),
+        activePersonId: next.activePersonId || "p1",
+        overrides: next.overrides || {}
+      };
+
+      normalized.people = normalized.people.map((person, index) => ({
+        id: person.id || `p${Date.now()}${index}`,
+        name: person.name || `반주자 ${index + 1}`,
+        color: person.color || defaultColors[index % defaultColors.length],
+        fixedServiceIds: Array.isArray(person.fixedServiceIds) ? person.fixedServiceIds : []
+      }));
+
+      if (!normalized.people.some(person => person.id === normalized.activePersonId)) {
+        normalized.activePersonId = normalized.people[0].id;
+      }
+
+      return normalized;
+    }
+
+    function saveState() {
+      localStorage.setItem("pianistScheduleState", JSON.stringify(state));
+      updateShareUrl();
+      render();
+      queueRemoteSave();
+    }
+
+    function encodeState() {
+      const json = JSON.stringify(state);
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+
+    function decodeHash() {
+      if (!location.hash.startsWith("#data=")) return null;
+      try {
+        return JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(6)))));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function updateShareUrl() {
+      const url = location.href.split("#")[0];
+      els.shareUrlBox.textContent = url;
+      return url;
+    }
+
+    function hasRemoteConfig() {
+      return Boolean(appConfig.SUPABASE_URL && appConfig.SUPABASE_ANON_KEY && window.supabase);
+    }
+
+    function setSyncStatus(message, kind = "muted") {
+      els.syncStatus.textContent = message;
+      els.syncStatus.style.color = kind === "good" ? "var(--good)" : kind === "danger" ? "var(--danger)" : "var(--muted)";
+    }
+
+    async function initRemoteSync() {
+      if (!hasRemoteConfig()) {
+        setSyncStatus("DB 미연결: config.js에 Supabase URL과 anon key를 넣으면 실시간 공유가 켜집니다.");
+        return;
+      }
+
+      try {
+        supabaseClient = window.supabase.createClient(appConfig.SUPABASE_URL, appConfig.SUPABASE_ANON_KEY);
+        const { data, error } = await supabaseClient
+          .from("schedule_state")
+          .select("state")
+          .eq("id", remoteStateId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data?.state) {
+          applyingRemoteState = true;
+          state = normalizeState(data.state);
+          localStorage.setItem("pianistScheduleState", JSON.stringify(state));
+          render();
+          applyingRemoteState = false;
+        } else {
+          await persistRemoteState();
+        }
+
+        supabaseClient
+          .channel(`schedule-state-${remoteStateId}`)
+          .on("postgres_changes", {
+            event: "*",
+            schema: "public",
+            table: "schedule_state",
+            filter: `id=eq.${remoteStateId}`
+          }, payload => {
+            if (!payload.new?.state) return;
+            applyingRemoteState = true;
+            state = normalizeState(payload.new.state);
+            localStorage.setItem("pianistScheduleState", JSON.stringify(state));
+            render();
+            applyingRemoteState = false;
+            setSyncStatus("DB 연결됨: 다른 기기 변경사항이 자동 반영됩니다.", "good");
+          })
+          .subscribe(status => {
+            if (status === "SUBSCRIBED") {
+              setSyncStatus("DB 연결됨: 모바일/PC가 같은 스케줄을 공유합니다.", "good");
+            }
+          });
+      } catch (error) {
+        console.error(error);
+        setSyncStatus(`DB 연결 실패: ${error.message}`, "danger");
+      }
+    }
+
+    function queueRemoteSave() {
+      if (!supabaseClient || applyingRemoteState) return;
+      clearTimeout(remoteSaveTimer);
+      remoteSaveTimer = setTimeout(() => {
+        persistRemoteState();
+      }, 350);
+    }
+
+    async function persistRemoteState() {
+      if (!supabaseClient) return;
+      const { error } = await supabaseClient
+        .from("schedule_state")
+        .upsert({
+          id: remoteStateId,
+          state,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error(error);
+        setSyncStatus(`DB 저장 실패: ${error.message}`, "danger");
+        return;
+      }
+
+      setSyncStatus("DB 저장 완료: 공유 URL 접속자에게 반영됩니다.", "good");
+    }
+
+    function pad(value) {
+      return String(value).padStart(2, "0");
+    }
+
+    function dateKey(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function parseDate(key) {
+      const [year, month, day] = key.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    }
+
+    function eventId(date, serviceId) {
+      return `${dateKey(date)}|${serviceId}`;
+    }
+
+    function getPerson(id) {
+      return state.people.find(person => person.id === id) || state.people[0];
+    }
+
+    function getPersonColor(id) {
+      return getPerson(id)?.color || defaultColors[0];
+    }
+
+    function colorToSoft(hex) {
+      const raw = (hex || "#2563eb").replace("#", "");
+      const bigint = parseInt(raw.length === 3 ? raw.split("").map(char => char + char).join("") : raw, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return `rgba(${r}, ${g}, ${b}, 0.10)`;
+    }
+
+    function getFixedPersonForService(serviceId) {
+      return state.people.find(person => person.fixedServiceIds?.includes(serviceId));
+    }
+
+    function getBaseAssignee(date, service) {
+      const fixedPerson = getFixedPersonForService(service.id);
+      if (fixedPerson) return fixedPerson.id;
+      const weekIndex = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 604800000);
+      const serviceIndex = services.findIndex(item => item.id === service.id);
+      return state.people[(weekIndex + serviceIndex) % state.people.length]?.id;
+    }
+
+    function getEvent(date, service) {
+      const id = eventId(date, service.id);
+      const basePersonId = getBaseAssignee(date, service);
+      const override = state.overrides[id] || {};
+      return {
+        id,
+        date: dateKey(date),
+        service,
+        basePersonId,
+        assignedPersonId: override.assignedPersonId || basePersonId,
+        status: override.status || "none",
+        available: override.available || [],
+        note: override.note || "",
+        setlistOrder: override.setlistOrder || override.setlist || "",
+        setlistImage: override.setlistImage || null
+      };
+    }
+
+    function getMonthEvents(year, month) {
+      const last = new Date(year, month + 1, 0).getDate();
+      const events = [];
+      for (let day = 1; day <= last; day++) {
+        const date = new Date(year, month, day);
+        services
+          .filter(service => service.weekday === date.getDay())
+          .forEach(service => events.push(getEvent(date, service)));
+      }
+      return events;
+    }
+
+    function render() {
+      renderPeople();
+      renderCalendar();
+      renderPanels();
+      updateShareUrl();
+    }
+
+    function renderPeople() {
+      els.activePerson.innerHTML = state.people
+        .map(person => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
+        .join("");
+      els.activePerson.value = state.activePersonId;
+
+      els.peopleList.innerHTML = state.people.map((person, index) => `
+        <div class="person">
+          <span class="person-dot" style="background:${person.color}"></span>
+          <div>
+            <strong>${escapeHtml(person.name)}</strong>
+            <small>${getFixedLabels(person) || `순번 ${index + 1}`}</small>
+          </div>
+          <div class="person-actions">
+            <button class="ghost" type="button" data-edit-person="${person.id}">수정</button>
+            <button class="danger" type="button" data-delete-person="${person.id}">삭제</button>
+          </div>
+        </div>
+      `).join("");
+
+      els.peopleList.querySelectorAll("[data-edit-person]").forEach(button => {
+        button.addEventListener("click", () => {
+          openPersonEditor(button.dataset.editPerson);
+        });
+      });
+
+      els.peopleList.querySelectorAll("[data-delete-person]").forEach(button => {
+        button.addEventListener("click", () => {
+          deletePersonById(button.dataset.deletePerson);
+        });
+      });
+    }
+
+    function getFixedLabels(person) {
+      return (person.fixedServiceIds || [])
+        .map(serviceId => services.find(service => service.id === serviceId)?.label)
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    function renderCalendar() {
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      els.monthTitle.textContent = `${year}년 ${month + 1}월`;
+
+      const firstDay = new Date(year, month, 1);
+      const start = new Date(year, month, 1 - firstDay.getDay());
+      const today = dateKey(new Date());
+      const chunks = [];
+
+      for (let i = 0; i < 42; i++) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
+        const inMonth = date.getMonth() === month;
+        const key = dateKey(date);
+        const dayEvents = services
+          .filter(service => service.weekday === date.getDay())
+          .map(service => getEvent(date, service));
+
+        chunks.push(`
+          <div class="day ${inMonth ? "" : "dim"}">
+            <div class="date-number">
+              <span>${date.getDate()}</span>
+              ${key === today ? "<span class='today-dot' title='오늘'></span>" : ""}
+            </div>
+            ${dayEvents.map(renderEventButton).join("")}
+          </div>
+        `);
+      }
+
+      els.calendarDays.innerHTML = chunks.join("");
+      els.calendarDays.querySelectorAll("[data-event-id]").forEach(button => {
+        button.addEventListener("click", () => openEvent(button.dataset.eventId));
+      });
+    }
+
+    function renderEventButton(event) {
+      const assigned = getPerson(event.assignedPersonId);
+      const base = getPerson(event.basePersonId);
+      const statusClass = event.status === "needed" ? "requested" : event.status === "confirmed" ? "changed" : "";
+      const changedText = event.assignedPersonId !== event.basePersonId ? `${base.name} > ${assigned.name}` : assigned.name;
+      const hasSetlist = Boolean(event.setlistOrder || event.setlistImage);
+      const setlistText = hasSetlist ? "콘티 있음" : "콘티 없음";
+      const color = getPersonColor(event.assignedPersonId);
+      const bg = event.status === "none" ? colorToSoft(color) : "";
+      return `
+        <button class="event ${statusClass}" type="button" data-event-id="${event.id}" style="border-left-color:${color};${bg ? `background:${bg};` : ""}">
+          <div class="event-title">${escapeHtml(event.service.label)}</div>
+          <div class="event-meta">
+            <span>${escapeHtml(changedText)}</span>
+            <span>${statusText(event.status)} · ${setlistText}</span>
+          </div>
+        </button>
+      `;
+    }
+
+    function renderPanels() {
+      const events = getMonthEvents(viewDate.getFullYear(), viewDate.getMonth());
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const reminders = events
+        .filter(event => event.status !== "none")
+        .map(event => ({ event, diff: Math.round((parseDate(event.date) - todayStart) / 86400000) }))
+        .filter(item => [7, 3, 1].includes(item.diff))
+        .sort((a, b) => a.diff - b.diff);
+
+      els.reminders.innerHTML = reminders.length ? reminders.map(({ event, diff }) => `
+        <button class="event ${event.status === "confirmed" ? "changed" : "requested"}" type="button" data-panel-event="${event.id}" style="border-left-color:${getPersonColor(event.assignedPersonId)}">
+          <div class="event-title">D-${diff} ${escapeHtml(event.service.label)}</div>
+          <div class="event-meta">
+            <span>${event.date} · ${escapeHtml(getPerson(event.assignedPersonId).name)}</span>
+            <span>${statusText(event.status)}</span>
+          </div>
+        </button>
+      `).join("") : `<div class="empty">이번 달 D-7, D-3, D-1 알림이 없습니다.</div>`;
+
+      const requests = events.filter(event => event.status === "needed");
+      els.requests.innerHTML = requests.length ? requests.map(event => `
+        <button class="event requested" type="button" data-panel-event="${event.id}" style="border-left-color:${getPersonColor(event.assignedPersonId)}">
+          <div class="event-title">${event.date} ${escapeHtml(event.service.label)}</div>
+          <div class="event-meta">
+            <span>현재 ${escapeHtml(getPerson(event.assignedPersonId).name)}</span>
+            <span>가능: ${event.available.map(id => escapeHtml(getPerson(id).name)).join(", ") || "아직 없음"}</span>
+          </div>
+        </button>
+      `).join("") : `<div class="empty">열린 변경 요청이 없습니다.</div>`;
+
+      document.querySelectorAll("[data-panel-event]").forEach(button => {
+        button.addEventListener("click", () => openEvent(button.dataset.panelEvent));
+      });
+    }
+
+    function statusText(status) {
+      if (status === "needed") return "변경 필요";
+      if (status === "confirmed") return "변경 확정";
+      return "요청 없음";
+    }
+
+    function openEvent(id) {
+      selectedEventId = id;
+      const event = eventFromId(id);
+      els.modalTitle.textContent = event.service.label;
+      els.modalSubtitle.textContent = `${event.date} · 기본 담당 ${getPerson(event.basePersonId).name}`;
+      els.assignedPerson.innerHTML = state.people
+        .map(person => `<option value="${person.id}">${escapeHtml(person.name)}</option>`)
+        .join("");
+      els.assignedPerson.value = event.assignedPersonId;
+      els.requestStatus.value = event.status;
+      els.requestNote.value = event.note;
+      els.setlistOrder.value = event.setlistOrder;
+      selectedImage = event.setlistImage;
+      els.setlistImageInput.value = "";
+      renderSetlistImage();
+      renderModalAvailability(event);
+      els.eventModal.classList.add("open");
+    }
+
+    function eventFromId(id) {
+      const [dateText, serviceId] = id.split("|");
+      const service = services.find(item => item.id === serviceId);
+      return getEvent(parseDate(dateText), service);
+    }
+
+    function renderModalAvailability(event) {
+      els.statusPills.innerHTML = `
+        <span class="pill ${event.status === "needed" ? "warn" : event.status === "confirmed" ? "good" : "blue"}">${statusText(event.status)}</span>
+        <span class="pill">담당 ${escapeHtml(getPerson(event.assignedPersonId).name)}</span>
+        ${event.assignedPersonId !== event.basePersonId ? `<span class="pill good">${escapeHtml(getPerson(event.basePersonId).name)} > ${escapeHtml(getPerson(event.assignedPersonId).name)}</span>` : ""}
+      `;
+
+      els.availablePeople.innerHTML = event.available.length
+        ? event.available.map(personId => `
+            <button class="good" type="button" data-confirm-person="${personId}">
+              ${escapeHtml(getPerson(personId).name)} 가능
+            </button>
+          `).join("")
+        : `<span class="pill">아직 가능 표시가 없습니다</span>`;
+
+      els.availablePeople.querySelectorAll("[data-confirm-person]").forEach(button => {
+        button.addEventListener("click", () => {
+          els.assignedPerson.value = button.dataset.confirmPerson;
+          els.requestStatus.value = "confirmed";
+        });
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderFixedServiceChecks(selectedIds = []) {
+      const selected = new Set(selectedIds);
+      els.fixedServiceChecks.innerHTML = services.map(service => `
+        <label class="check-tile">
+          <input type="checkbox" value="${service.id}" ${selected.has(service.id) ? "checked" : ""}>
+          ${escapeHtml(service.label)}
+        </label>
+      `).join("");
+    }
+
+    function openPersonEditor(personId = null) {
+      editingPersonId = personId;
+      const person = personId ? getPerson(personId) : null;
+      els.personModalTitle.textContent = person ? "반주자 수정" : "반주자 등록";
+      els.personName.value = person?.name || "";
+      els.personColor.value = person?.color || defaultColors[state.people.length % defaultColors.length];
+      renderFixedServiceChecks(person?.fixedServiceIds || []);
+      els.deletePerson.style.display = person ? "" : "none";
+      els.personModal.classList.add("open");
+    }
+
+    function closePersonEditor() {
+      els.personModal.classList.remove("open");
+      editingPersonId = null;
+    }
+
+    function selectedFixedServiceIds() {
+      return Array.from(els.fixedServiceChecks.querySelectorAll("input:checked")).map(input => input.value);
+    }
+
+    function savePersonEditor() {
+      const name = els.personName.value.trim();
+      if (!name) {
+        alert("반주자 이름을 입력해주세요.");
+        return;
+      }
+
+      const fixedServiceIds = selectedFixedServiceIds();
+      const id = editingPersonId || `p${Date.now()}`;
+      state.people.forEach(person => {
+        if (person.id !== id) {
+          person.fixedServiceIds = (person.fixedServiceIds || []).filter(serviceId => !fixedServiceIds.includes(serviceId));
+        }
+      });
+
+      if (editingPersonId) {
+        const person = getPerson(editingPersonId);
+        person.name = name;
+        person.color = els.personColor.value;
+        person.fixedServiceIds = fixedServiceIds;
+      } else {
+        state.people.push({
+          id,
+          name,
+          color: els.personColor.value,
+          fixedServiceIds
+        });
+        state.activePersonId = id;
+      }
+
+      closePersonEditor();
+      saveState();
+    }
+
+    function deletePersonById(personId) {
+      if (state.people.length <= 1) {
+        alert("반주자는 최소 1명은 남아 있어야 합니다.");
+        return;
+      }
+
+      const person = getPerson(personId);
+      if (!confirm(`${person.name} 반주자를 삭제할까요?`)) return;
+
+      state.people = state.people.filter(item => item.id !== personId);
+      if (state.activePersonId === personId) {
+        state.activePersonId = state.people[0].id;
+      }
+
+      Object.keys(state.overrides).forEach(key => {
+        const override = state.overrides[key];
+        if (override.assignedPersonId === personId) delete override.assignedPersonId;
+        override.available = (override.available || []).filter(id => id !== personId);
+      });
+
+      closePersonEditor();
+      saveState();
+    }
+
+    function renderSetlistImage() {
+      if (!selectedImage) {
+        els.setlistImagePreview.classList.remove("visible");
+        els.setlistImage.removeAttribute("src");
+        els.setlistImageName.textContent = "";
+        return;
+      }
+
+      els.setlistImage.src = selectedImage.dataUrl;
+      els.setlistImageName.textContent = selectedImage.name;
+      els.setlistImagePreview.classList.add("visible");
+    }
+
+    function getOverrideDraft() {
+      const previous = state.overrides[selectedEventId] || {};
+      return {
+        ...previous,
+        assignedPersonId: els.assignedPerson.value,
+        status: els.requestStatus.value,
+        note: els.requestNote.value.trim(),
+        setlistOrder: els.setlistOrder.value.trim(),
+        setlistImage: selectedImage
+      };
+    }
+
+    els.activePerson.addEventListener("change", () => {
+      state.activePersonId = els.activePerson.value;
+      saveState();
+    });
+
+    els.addPersonBtn.addEventListener("click", () => {
+      openPersonEditor();
+    });
+
+    els.closePersonModal.addEventListener("click", () => {
+      closePersonEditor();
+    });
+
+    els.personModal.addEventListener("click", event => {
+      if (event.target === els.personModal) closePersonEditor();
+    });
+
+    els.savePerson.addEventListener("click", () => {
+      savePersonEditor();
+    });
+
+    els.deletePerson.addEventListener("click", () => {
+      if (editingPersonId) deletePersonById(editingPersonId);
+    });
+
+    els.prevMonth.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
+      render();
+    });
+
+    els.nextMonth.addEventListener("click", () => {
+      viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
+      render();
+    });
+
+    els.todayBtn.addEventListener("click", () => {
+      viewDate = new Date();
+      render();
+    });
+
+    els.closeModal.addEventListener("click", () => {
+      els.eventModal.classList.remove("open");
+    });
+
+    els.eventModal.addEventListener("click", event => {
+      if (event.target === els.eventModal) els.eventModal.classList.remove("open");
+    });
+
+    els.markAvailable.addEventListener("click", () => {
+      if (!selectedEventId) return;
+      const override = getOverrideDraft();
+      const active = state.activePersonId;
+      const available = new Set(override.available || []);
+      available.add(active);
+      override.available = Array.from(available);
+      override.status = override.status === "none" ? "needed" : override.status;
+      state.overrides[selectedEventId] = override;
+      saveState();
+      openEvent(selectedEventId);
+    });
+
+    els.setlistImageInput.addEventListener("change", () => {
+      const file = els.setlistImageInput.files?.[0];
+      if (!file) return;
+
+      if (!["image/jpeg", "image/png"].includes(file.type)) {
+        alert("JPG 또는 PNG 파일만 올릴 수 있습니다.");
+        els.setlistImageInput.value = "";
+        return;
+      }
+
+      if (file.size > 2.5 * 1024 * 1024) {
+        alert("URL 공유용이라 2.5MB 이하 이미지만 올릴 수 있습니다.");
+        els.setlistImageInput.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        selectedImage = {
+          name: file.name,
+          type: file.type,
+          dataUrl: reader.result
+        };
+        renderSetlistImage();
+      });
+      reader.readAsDataURL(file);
+    });
+
+    els.removeSetlistImage.addEventListener("click", () => {
+      selectedImage = null;
+      els.setlistImageInput.value = "";
+      renderSetlistImage();
+    });
+
+    els.saveEvent.addEventListener("click", () => {
+      if (!selectedEventId) return;
+      state.overrides[selectedEventId] = getOverrideDraft();
+      saveState();
+      els.eventModal.classList.remove("open");
+    });
+
+    els.clearEvent.addEventListener("click", () => {
+      if (!selectedEventId) return;
+      delete state.overrides[selectedEventId];
+      saveState();
+      els.eventModal.classList.remove("open");
+    });
+
+    els.copyShareBtn.addEventListener("click", async () => {
+      const url = updateShareUrl();
+      try {
+        await navigator.clipboard.writeText(url);
+        els.copyShareBtn.textContent = "복사됨";
+        setTimeout(() => { els.copyShareBtn.textContent = "앱 URL 복사"; }, 1200);
+      } catch (_) {
+        prompt("아래 URL을 복사하세요", url);
+      }
+    });
+
+    window.addEventListener("hashchange", () => {
+      const next = decodeHash();
+      if (!next) return;
+      state = next;
+      saveState();
+    });
+
+    render();
+    initRemoteSync();
+  </script>
+</body>
+</html>
